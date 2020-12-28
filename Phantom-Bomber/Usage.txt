@@ -1,0 +1,52 @@
+    ____  __                __                     ____                  __             
+   / __ \/ /_  ____ _____  / /_____  ____ ___     / __ )____  ____ ___  / /_  ___  _____
+  / /_/ / __ \/ __ `/ __ \/ __/ __ \/ __ `__ \   / __  / __ \/ __ `__ \/ __ \/ _ \/ ___/
+ / ____/ / / / /_/ / / / / /_/ /_/ / / / / / /  / /_/ / /_/ / / / / / / /_/ /  __/ /    
+/_/   /_/ /_/\__,_/_/ /_/\__/\____/_/ /_/ /_/  /_____/\____/_/ /_/ /_/_.___/\___/_/    
+
+Remote process injector combining Phantom DLL Hollowing and Stack Bombing.
+
+REQUIRED
+
+--payload-file <path> 
+
+OPTIONAL
+
+--alloc-type {dll-map-hollow|txf-dll-map-hollow||mapped} (default: mapped)
+--exec-method {call|create-thread|create-thread-stealth} (default: call/same thread)
+--target-tid <TID> (default: Explorer.exe alertable thread will be targeted)
+--RWX-to-RX
+--unmap-after-exec
+
+
+--payload-file      The file containing the shellcode to be used as an implant.
+
+--alloc-type        The way in which the dynamic memory used to hold the payload implant should be
+                    created.
+                    
+                    dll-map-hollow      A view of an image section generated from a DLL in System32.
+                    txf-dll-map-hollow  A view of an image section generated from a transacted DLL from
+                                        System32 which has already been implanted with the payload.
+                    mapped              A mapped view of a section derived from the Windows Page File.
+
+--exec-method       The method the stack bombed thread should use to execute the payload.
+                    
+                    call                Execute the payload in the same stack bombed thread with a RET
+                                        gadget; Stack will be restored after payload completes execution.
+                    create-thread       Execute the payload in a new thread with CreateThread. Original 
+                                        stack on bombed thread will be restored after new thread is created.
+                    create-thread-stealth   Execute the payload in a new thread by first moving the 
+                                            target payload address into RCX, then creating a new
+                                            thread with an entrypoint of a "push RCX, ret" gadget. Does 
+                                            not work vs CFG-enabled processes (like Explorer)
+               
+--target-tid        The thread ID to target. Must be alertable. If none is provided, a known alertable 
+                    thread in Explorer that is safe for stack bombing will be targeted.
+
+--RWX-to-RX         If passed, the mapped section with the payload will be VirtualProtected to RX (or 
+                    the PE's original protections) after the payload is written. TXF-dll-map-hollow option 
+                    automatically apply this.
+                    If not passed, the mapped section will remain RWX. This is likely necessary if the payload
+                    performs dynamic self-decryption upon execution (e.g. metasploit xor/dynamic)
+
+--unmap-after-exec  If passed, the stack bombed thread will unmap the payload after execution.
