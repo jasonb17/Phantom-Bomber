@@ -4,6 +4,8 @@ Phantom Bomber is a remote process injector that first creates a shared section 
 
 Tested on Windows 10 version 2004, x64
 
+![alt text](https://github.com/jasonb17/Phantom-Bomber/blob/main/demo.png?raw=true)
+
 ## Usage
 ```
     ____  __                __                     ____                  __             
