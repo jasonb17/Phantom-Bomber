@@ -19,12 +19,22 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="buildrop.h" />
     <ClInclude Include="helper.h" />
+    <ClInclude Include="hollowdll.h" />
     <ClInclude Include="memmem.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="buildrop.cpp" />
+    <ClCompile Include="hollowdll.cpp" />
     <ClCompile Include="memmem.c" />
-    <ClCompile Include="Source.cpp" />
+    <ClCompile Include="main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Usage.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="Usage.txt" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

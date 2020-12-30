@@ -1,11 +1,102 @@
 #pragma once
+
 #define _WIN32_DCOM
 #include <iostream>
 #include <comdef.h>
 #include <Wbemidl.h>
 #include <vector>
 #include <tlhelp32.h>
+//#include <Windows.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <winternl.h>
+#include <codecvt>
+#include <Urlmon.h>   // URLOpenBlockingStreamW()
+#include <atlbase.h>  // CComPtr
+#include <map>
+#include <psapi.h>
+#include <processthreadsapi.h>
+#include <algorithm>
+extern "C" {
+#include "memmem.h"
+}
 #pragma comment(lib, "wbemuuid.lib")
+
+
+
+typedef struct {
+	HANDLE process;
+	HANDLE thread;
+	DWORD pid;
+	DWORD tid;
+} TARGET_PROCESS;
+
+typedef std::pair<std::string, DWORD64> TStrDWORD64Pair;
+typedef std::map<std::string, DWORD64> TStrDWORD64Map;
+
+typedef struct {
+	LPVOID buffer;
+	SIZE_T buffer_size;
+	TStrDWORD64Map* metadata;
+} PINJECTRA_PACKET;
+
+typedef void(*fnAddr)();
+
+typedef LONG(__stdcall* NtCreateSection_t)(HANDLE*, ULONG, void*, LARGE_INTEGER*, ULONG, ULONG, HANDLE);
+typedef LONG(__stdcall* NtMapViewOfSection_t)(HANDLE, HANDLE, PVOID*, ULONG_PTR, SIZE_T, PLARGE_INTEGER, PSIZE_T, DWORD, ULONG, ULONG);
+typedef NTSTATUS(__stdcall* NtCreateTransaction_t)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, LPGUID, HANDLE, ULONG, ULONG, ULONG, PLARGE_INTEGER, PUNICODE_STRING);
+typedef NTSTATUS(__stdcall* NtOpenSection_t)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES);
+typedef struct PINITIAL_TEB;
+typedef NTSTATUS(__stdcall* NtCreateThreadEx_t)(PHANDLE, ACCESS_MASK, LPVOID, HANDLE, LPTHREAD_START_ROUTINE, LPVOID, BOOL, ULONG, ULONG, ULONG, LPVOID);
+
+typedef NTSTATUS(__stdcall* NtExtendSection_t)(HANDLE, PLARGE_INTEGER);
+
+#pragma once
+typedef struct _CLIENT_ID* PCLIENT_ID;
+
+static NTSTATUS(NTAPI* NtQueueApcThread)(
+	_In_ HANDLE ThreadHandle,
+	_In_ PVOID ApcRoutine,
+	_In_ PVOID ApcRoutineContext OPTIONAL,
+	_In_ PVOID ApcStatusBlock OPTIONAL,
+	//_In_ ULONG ApcReserved OPTIONAL
+	_In_ __int64 ApcReserved OPTIONAL
+	);
+
+typedef NTSTATUS(WINAPI* NTQUERYINFORMATIONTHREAD)(
+	HANDLE ThreadHandle,
+	ULONG ThreadInformationClass,
+	PVOID ThreadInformation,
+	ULONG ThreadInformationLength,
+	PULONG ReturnLength);
+
+typedef NTSTATUS(WINAPI* MyRtlCreateUserThread)(
+	IN HANDLE ProcessHandle,
+	IN PSECURITY_DESCRIPTOR SecurityDescriptor OPTIONAL,
+	IN BOOLEAN CreateSuspended,
+	IN ULONG StackZeroBits,
+	IN OUT PULONG StackReserved,
+	IN OUT PULONG StackCommit,
+	IN PVOID StartAddress,
+	IN PVOID StartParameter OPTIONAL,
+	OUT PHANDLE ThreadHandle,
+	OUT PCLIENT_ID ClientID);
+
+typedef void(__stdcall* MyRtlInitUnicodeString)(
+	IN PUNICODE_STRING DestinationString,
+	IN __drv_aliasesMem PCWSTR SourceString
+	);
+
+typedef HANDLE(__stdcall* MyBaseGetNamedObjectDirectory)();
+
+static HMODULE hNtdll = LoadLibraryW(L"ntdll.dll");
+
+static MyRtlInitUnicodeString RtlInitUnicodeString2 = (MyRtlInitUnicodeString)GetProcAddress(GetModuleHandleA("ntdll"), "RtlInitUnicodeString");
+static NtCreateSection_t NtCreateSection = (NtCreateSection_t)GetProcAddress(hNtdll, "NtCreateSection");
+static NtExtendSection_t NtExtendSection = (NtExtendSection_t)GetProcAddress(hNtdll, "NtExtendSection");
+static NtMapViewOfSection_t NtMapViewOfSection = (NtMapViewOfSection_t)GetProcAddress(hNtdll, "NtMapViewOfSection");
+static NtCreateTransaction_t NtCreateTransaction = (NtCreateTransaction_t)GetProcAddress(hNtdll, "NtCreateTransaction");
+static NtCreateThreadEx_t NtCreateThreadEx = (NtCreateThreadEx_t)GetProcAddress(hNtdll, "NtCreateThreadEx");
 
 
 typedef struct {
@@ -13,10 +104,10 @@ typedef struct {
 	size_t size;
 }TEXT_SECTION_INFO;
 
-bool CheckRelocRange(uint8_t* pRelocBuf, uint32_t dwRelocBufSize, uint32_t dwStartRVA, uint32_t dwEndRVA);
-void* GetPAFromRVA(uint8_t* pPeBuf, IMAGE_NT_HEADERS* pNtHdrs, IMAGE_SECTION_HEADER* pInitialSectHdrs, uint64_t qwRVA);
+static bool CheckRelocRange(uint8_t* pRelocBuf, uint32_t dwRelocBufSize, uint32_t dwStartRVA, uint32_t dwEndRVA);
+static void* GetPAFromRVA(uint8_t* pPeBuf, IMAGE_NT_HEADERS* pNtHdrs, IMAGE_SECTION_HEADER* pInitialSectHdrs, uint64_t qwRVA);
 
-IMAGE_SECTION_HEADER* GetContainerSectHdr(IMAGE_NT_HEADERS* pNtHdrs, IMAGE_SECTION_HEADER* pInitialSectHeader, uint64_t qwRVA) {
+static IMAGE_SECTION_HEADER* GetContainerSectHdr(IMAGE_NT_HEADERS* pNtHdrs, IMAGE_SECTION_HEADER* pInitialSectHeader, uint64_t qwRVA) {
 	for (uint32_t dwX = 0; dwX < pNtHdrs->FileHeader.NumberOfSections; dwX++) {
 		IMAGE_SECTION_HEADER* pCurrentSectHdr = pInitialSectHeader;
 		uint32_t dwCurrentSectSize;
@@ -38,7 +129,7 @@ IMAGE_SECTION_HEADER* GetContainerSectHdr(IMAGE_NT_HEADERS* pNtHdrs, IMAGE_SECTI
 	return nullptr;
 }
 
-void* GetPAFromRVA(uint8_t* pPeBuf, IMAGE_NT_HEADERS* pNtHdrs, IMAGE_SECTION_HEADER* pInitialSectHdrs, uint64_t qwRVA) {
+static void* GetPAFromRVA(uint8_t* pPeBuf, IMAGE_NT_HEADERS* pNtHdrs, IMAGE_SECTION_HEADER* pInitialSectHdrs, uint64_t qwRVA) {
 	IMAGE_SECTION_HEADER* pContainSectHdr;
 
 	if ((pContainSectHdr = GetContainerSectHdr(pNtHdrs, pInitialSectHdrs, qwRVA)) != nullptr) {
@@ -53,7 +144,7 @@ void* GetPAFromRVA(uint8_t* pPeBuf, IMAGE_NT_HEADERS* pNtHdrs, IMAGE_SECTION_HEA
 }
 
 
-bool CheckRelocRange(uint8_t* pRelocBuf, uint32_t dwRelocBufSize, uint32_t dwStartRVA, uint32_t dwEndRVA) {
+static bool CheckRelocRange(uint8_t* pRelocBuf, uint32_t dwRelocBufSize, uint32_t dwStartRVA, uint32_t dwEndRVA) {
 	IMAGE_BASE_RELOCATION* pCurrentRelocBlock;
 	uint32_t dwRelocBufOffset, dwX;
 	bool bWithinRange = false;
@@ -85,7 +176,7 @@ bool CheckRelocRange(uint8_t* pRelocBuf, uint32_t dwRelocBufSize, uint32_t dwSta
 }
 
 
-TEXT_SECTION_INFO GetTextSection(HMODULE mod)
+static TEXT_SECTION_INFO GetTextSection(HMODULE mod)
 {
 	// Parse a module in order to retrieve its text section
 
@@ -121,7 +212,7 @@ TEXT_SECTION_INFO GetTextSection(HMODULE mod)
 	return section_info;
 }
 
-int getPID(std::wstring processName) {
+static int getPID(std::wstring processName) {
 
 	std::vector<DWORD> pids;
 	std::wstring targetProcessName = processName;
@@ -147,7 +238,7 @@ int getPID(std::wstring processName) {
 	return pids[0];
 }
 
-std::wstring stringToWstring(const std::string& t_str)
+static std::wstring stringToWstring(const std::string& t_str)
 {
 	//setup converter
 	typedef std::codecvt_utf8<wchar_t> convert_type;
@@ -157,7 +248,7 @@ std::wstring stringToWstring(const std::string& t_str)
 	return converter.from_bytes(t_str);
 }
 
-std::vector<DWORD64> EnumThreads(std::wstring processName)
+static std::vector<DWORD64> EnumThreads(std::wstring processName)
 {
 	auto targetPID = getPID(processName);
 	std::vector<DWORD64> results;
@@ -366,4 +457,3 @@ std::vector<DWORD64> EnumThreads(std::wstring processName)
 	return results;   // Program successfully completed.
 
 }
-
