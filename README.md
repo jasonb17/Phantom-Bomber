@@ -88,7 +88,21 @@ See https://i.blackhat.com/USA-19/Thursday/us-19-Kotler-Process-Injection-Techni
 \[more detail to be added\]
 
 
-## Detection
+## Detection/IOCs
+
+(high level)
+- ntqueueapcthread - unusual api call
+- handle obtained to explorer - sysmon event id 10
+- explorer obtains handle to section with unknown name
+- phantom-dll-hollowing
+    - from Forrest-Orr ([https://www.forrest-orr.net/post/masking-malicious-memory-artifacts-part-ii-insights-from-moneta](https://www.forrest-orr.net/post/masking-malicious-memory-artifacts-part-ii-insights-from-moneta))
+
+        ![https://static.wixstatic.com/media/a27d24_fbb501ef46c34b899d90134654f66689~mv2.png/v1/fit/w_300,h_300,al_c,q_5/file.png](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/1d7de01b-2474-4ce4-90de-dc9d011ed9da/Untitled.png)
+
+        _"Notably in the image above, the missing PEB module suspicion persists (since the region in question is technically image memory without a corresponding PEB module entry) but the image itself is unknown. This is because TxF isolates its transactions from other processes, including in this case Moneta. When attempting to query the name of the file associated with the image region from its underlying FILE_OBJECT using the PSAPI.DLL!GetMappedFileNameW API, external processes will fail in the unique instance that the section underlying the image mapping view was generated using a transacted handle created by an external process. This is the most robust method I’ve devised to reliably detect phantom DLL hollowing and process doppelganging. This also results in the subregions of this image mapping region (distinguished by their unique VAD entries in the kernel) being unable to be associated with PE sections as they are in Figure 2"_
+
+- create-thread (without stealth option) - 0x00 suspicious thread entrypoint
+- RWX-to-RX - calling virtualprotect from RW to RX
 
 ## Credit
 
