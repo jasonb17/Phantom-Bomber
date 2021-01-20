@@ -85,10 +85,17 @@ See https://www.forrest-orr.net/post/malicious-memory-artifacts-part-i-dll-hollo
 
 #### Stack Bombing
 
-See https://i.blackhat.com/USA-19/Thursday/us-19-Kotler-Process-Injection-Techniques-Gotta-Catch-Them-All-wp.pdf for more details
+See https://i.blackhat.com/USA-19/Thursday/us-19-Kotler-Process-Injection-Techniques-Gotta-Catch-Them-All-wp.pdf technique #26 for more details
 
 \[more detail to be added\]
 
+#### Targeting Explorer
+
+If no target thread ID is passed, the POC will target a known "alertable" thread in Explorer which consistently responds to queued APCs. Interestingly, this thread never calls one of the "alertable functions" referred to in the BlackHat presentation (SleepEx-> NtDelayExecution, WaitForSingleObjectEx-> NtWaitForSingleObject, WaitForMultipleObjectsEx-> NtWaitForMultipleObjects, SignalObjectAndWait-> NtSignalAndWaitForSingleObject, RealMsgWaitForMultipleObjectsEx-> NtUserMsgWaitForMultipleObjectsEx), nor takes any of the other paths to the alertable state mentioned in Ori Damari's APC series: https://repnz.github.io/posts/apc/user-apc/
+
+Instead, its path to becoming alertable is calling NtQuerySystemInformation querying for SystemPolicyInformation, which leads to a lock via a KeWaitForMutexObject kernel call; this lock (as far as I can see) never releases under normal operation.
+
+A future blog post on this injector will cover my deep dive into this thread.
 
 ## Detection/IOCs
 
